@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  CASHIER
+  PARENT
+  STUDENT
+}
+
+enum MealCategory {
+  SNACKS
+  MEALS
+  BEVERAGES
+  DESSERTS
+  HEALTHY
+}
+
+enum HealthTag {
+  HEALTHY
+  BALANCED
+  OCCASIONAL
+}
+
+enum PaymentMethod {
+  WALLET
+}
+
+model User {
+  id                String             @id @default(cuid())
+  name              String
+  email             String             @unique
+  passwordHash      String
+  role              Role
+  wildCardId        String?            @unique
+  studentAccount    StudentAccount?
+  parentLinks       ParentStudentLink[] @relation("ParentLinks")
+  studentLinks      ParentStudentLink[] @relation("StudentLinks")
+  studentTransactions Transaction[]    @relation("StudentTransactions")
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+}
+
+model StudentAccount {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  walletBalance      Decimal  @db.Decimal(10, 2)
+  monthlyLimit       Decimal  @db.Decimal(10, 2)
+  dailyLimit         Decimal? @db.Decimal(10, 2)
+  spentThisMonth     Decimal  @default(0) @db.Decimal(10, 2)
+  spentToday         Decimal  @default(0) @db.Decimal(10, 2)
+  dailySpendUpdatedAt DateTime?
+  updatedAt          DateTime @updatedAt
+}
+
+model MealItem {
+  id                String            @id @default(cuid())
+  name              String
+  slug              String            @unique
+  description       String
+  category          MealCategory
+  price             Decimal           @db.Decimal(10, 2)
+  quantityAvailable Int
+  iconKey           String
+  healthTag         HealthTag
+  isActive          Boolean           @default(true)
+  transactionItems  TransactionItem[]
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+}
+
+model Transaction {
+  id             String            @id @default(cuid())
+  studentId      String
+  student        User              @relation("StudentTransactions", fields: [studentId], references: [id], onDelete: Restrict)
+  totalAmount    Decimal           @db.Decimal(10, 2)
+  paymentMethod  PaymentMethod
+  createdAt      DateTime          @default(now())
+  items          TransactionItem[]
+}
+
+model TransactionItem {
+  id            String      @id @default(cuid())
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  mealItemId    String
+  mealItem      MealItem    @relation(fields: [mealItemId], references: [id], onDelete: Restrict)
+  quantity      Int
+  unitPrice     Decimal     @db.Decimal(10, 2)
+  subtotal      Decimal     @db.Decimal(10, 2)
+}
+
+model ParentStudentLink {
+  parentId   String
+  studentId  String
+  parent     User @relation("ParentLinks", fields: [parentId], references: [id], onDelete: Cascade)
+  student    User @relation("StudentLinks", fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@id([parentId, studentId])
+}
+
+model RfidScanEvent {
+  id         String   @id @default(cuid())
+  wildCardId String
+  deviceId   String
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+}
